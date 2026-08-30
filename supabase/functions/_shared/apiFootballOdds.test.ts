@@ -27,6 +27,16 @@ describe("API-Football odds normalization", () => {
     expect(new Set(rows.map((row) => row.bookmakerName))).toEqual(new Set(["Bet365"]));
   });
 
+  it("can retain fallback bookmakers with an explicit lower source tier", () => {
+    const rows = normalizeOddsFixture(fixture, true);
+    expect(rows).toHaveLength(8);
+    expect(rows).toContainEqual(expect.objectContaining({
+      bookmakerName: "Unapproved Book",
+      isPrimaryBookmaker: false,
+      source: expect.objectContaining({ sourceTier: "FALLBACK" }),
+    }));
+  });
+
   it("normalizes handicap and total lines without changing their sign", () => {
     const rows = normalizeOddsFixture(fixture);
     expect(rows).toContainEqual(expect.objectContaining({ market: "AH", selection: "HOME", line: -0.25, decimalOdds: 1.95 }));
