@@ -1,0 +1,60 @@
+name: Sync Football Fixtures
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/sync-football-fixtures.yml"
+  schedule:
+    - cron: "0 4 * * *"
+    - cron: "0 11 * * *"
+  workflow_dispatch:
+    inputs:
+      session:
+        description: Bangkok fixture window to synchronize
+        required: true
+        default: morning
+        type: choice
+        options:
+          - morning
+          - evening
+          - all
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-football-fixtures-production
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Select Bangkok session
+        id: session
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+          MANUAL_SESSION: ${{ inputs.session }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            session="$MANUAL_SESSION"
+          elif [ "$EVENT_SCHEDULE" = "0 11 * * *" ]; then
+            session="evening"
+          else
+            session="morning"
+          fi
+          echo "name=$session" >> "$GITHUB_OUTPUT"
+
+      - name: Synchronize fixtures
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SESSION: ${{ steps.session.outputs.name }}
+        run: |
+          curl --silent --show-error --fail-with-body \
+            --retry 2 --retry-all-errors \
+            --request POST \
+            --header "x-cron-secret: $CRON_SECRET" \
+            "https://qkiradbwrajrqgnyjhvd.supabase.co/functions/v1/sync-fixtures?session=$SESSION"
