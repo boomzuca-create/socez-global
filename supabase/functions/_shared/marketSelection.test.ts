@@ -44,4 +44,12 @@ describe("market-led candidate ranking", () => {
     expect(selectPublishedCandidates(candidates, 2)).toHaveLength(2);
     expect(selectPublishedCandidates(candidates, 2).every((candidate) => candidate.score >= 70)).toBe(true);
   });
+
+  it("rejects alternate Asian lines priced outside the approved 1.80 to 2.00 band", () => {
+    const rows: MarketSnapshot[] = [
+      { bookmakerId: "a", reliabilityWeight: 1, market: "AH", selection: "HOME", line: -1.5, decimalOdds: 9.5, capturedAt },
+      { bookmakerId: "a", reliabilityWeight: 1, market: "AH", selection: "AWAY", line: 1.5, decimalOdds: 1.02, capturedAt },
+    ];
+    expect(rankMarketCandidates(rows, 100, now)).toHaveLength(0);
+  });
 });

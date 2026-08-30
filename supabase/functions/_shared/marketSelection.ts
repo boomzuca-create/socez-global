@@ -58,6 +58,13 @@ function freshnessScore(capturedAt: string, now: Date): number {
   return 30;
 }
 
+function acceptableInvestmentPrice(row: MarketSnapshot): boolean {
+  if (row.market === "AH" || row.market === "OU") {
+    return row.decimalOdds >= 1.80 && row.decimalOdds <= 2.00;
+  }
+  return row.decimalOdds >= 1.50 && row.decimalOdds <= 3.50;
+}
+
 export function rankMarketCandidates(
   snapshots: MarketSnapshot[],
   dataQuality: number,
@@ -98,14 +105,16 @@ export function rankMarketCandidates(
   }
 
   const safeDataQuality = Math.round(clamp(dataQuality));
-  return [...observations.values()].map((items) => {
+  return [...observations.values()].flatMap((items) => {
     const weightTotal = items.reduce((total, item) => total + item.weight, 0);
     const modelProbability = items.reduce((total, item) => total + item.probability * item.weight, 0) / weightTotal;
     const variance = items.reduce(
       (total, item) => total + item.weight * (item.probability - modelProbability) ** 2,
       0,
     ) / weightTotal;
-    const best = items.reduce((winner, item) => item.row.decimalOdds > winner.row.decimalOdds ? item : winner);
+    const eligiblePrices = items.filter((item) => acceptableInvestmentPrice(item.row));
+    if (eligiblePrices.length === 0) return [];
+    const best = eligiblePrices.reduce((winner, item) => item.row.decimalOdds > winner.row.decimalOdds ? item : winner);
     const expectedValue = modelProbability * best.row.decimalOdds - 1;
     const criteria = {
       marketValue: Math.round(clamp(50 + expectedValue * 1_000)),
@@ -121,8 +130,13 @@ export function rankMarketCandidates(
       criteria.dataQuality * 0.20 +
       criteria.priceFreshness * 0.10,
     );
-    const tier = score >= 75 ? "QUALIFIED" : score >= 70 ? "CONDITIONAL" : "BEST_AVAILABLE";
-    return {
+    const freshnessPass = criteria.priceFreshness >= 60;
+    const tier = freshnessPass && score >= 75
+      ? "QUALIFIED"
+      : freshnessPass && score >= 70
+      ? "CONDITIONAL"
+      : "BEST_AVAILABLE";
+    return [{
       market: best.row.market,
       selection: best.row.selection,
       line: best.row.line,
@@ -131,7 +145,7 @@ export function rankMarketCandidates(
       marketProbability: 1 / best.row.decimalOdds,
       expectedValue,
       score,
-      riskFlag: score >= 80 ? "GREEN" : score >= 70 ? "YELLOW" : "RED",
+      riskFlag: tier === "BEST_AVAILABLE" ? "RED" : score >= 80 ? "GREEN" : "YELLOW",
       tier,
       bookmakerCount: items.length,
       priceCapturedAt: best.row.capturedAt,
@@ -143,12 +157,12 @@ export function rankMarketCandidates(
         `Data quality ${criteria.dataQuality}%`,
         `Price freshness ${criteria.priceFreshness}%`,
       ],
-    } satisfies RankedCandidate;
+    } satisfies RankedCandidate];
   }).sort((left, right) => right.score - left.score || right.expectedValue - left.expectedValue);
 }
 
 export function selectPublishedCandidates(candidates: RankedCandidate[], maximum?: number): RankedCandidate[] {
-  const rankedQualified = candidates.filter((candidate) => candidate.score >= 70);
+  const rankedQualified = candidates.filter((candidate) => candidate.tier !== "BEST_AVAILABLE");
   const qualified = maximum === undefined ? rankedQualified : rankedQualified.slice(0, maximum);
   return qualified.length > 0 ? qualified : candidates.slice(0, 1);
 }
