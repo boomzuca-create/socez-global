@@ -131,9 +131,9 @@ export function rankMarketCandidates(
       criteria.priceFreshness * 0.10,
     );
     const freshnessPass = criteria.priceFreshness >= 60;
-    const tier = freshnessPass && score >= 75
+    const tier = freshnessPass && expectedValue >= 0.05 && score >= 75
       ? "QUALIFIED"
-      : freshnessPass && score >= 70
+      : freshnessPass && expectedValue > 0 && score >= 70
       ? "CONDITIONAL"
       : "BEST_AVAILABLE";
     return [{
