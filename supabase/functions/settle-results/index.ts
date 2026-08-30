@@ -102,7 +102,7 @@ Deno.serve(async (request) => {
     const picks = pickData as unknown as PickRow[];
 
     const resultDates = [...new Set(picks.map((pick) => bangkokDate(new Date(fixtureOf(pick).kickoff_at))))]
-      .sort()
+      .sort((left, right) => right.localeCompare(left))
       .slice(0, 2);
     const providerRows = (await Promise.all(resultDates.map((resultDate) => fetchFixturesForDate(apiKey, resultDate)))).flat();
     const providerById = new Map(providerRows.map((item) => [String(item.fixture.id), item]));
