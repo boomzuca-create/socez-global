@@ -58,10 +58,15 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           SESSION: ${{ steps.session.outputs.name }}
         run: |
-          curl --silent --show-error --fail-with-body \
-            --request POST \
-            --header "x-cron-secret: $CRON_SECRET" \
-            "https://qkiradbwrajrqgnyjhvd.supabase.co/functions/v1/sync-odds?session=$SESSION"
+          for batch in 0 1 2 3 4; do
+            curl --silent --show-error --fail-with-body \
+              --request POST \
+              --header "x-cron-secret: $CRON_SECRET" \
+              "https://qkiradbwrajrqgnyjhvd.supabase.co/functions/v1/sync-odds?session=$SESSION&batch=$batch"
+            if [ "$batch" -lt 4 ]; then
+              sleep 65
+            fi
+          done
 
       - name: Generate ranked investment picks
         env:
