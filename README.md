@@ -78,6 +78,12 @@ supabase secrets set API_FOOTBALL_KEY=YOUR_KEY CRON_SECRET=YOUR_RANDOM_SECRET
 supabase functions deploy sync-fixtures --no-verify-jwt
 ```
 
+The repository also includes `.github/workflows/deploy-supabase-functions.yml`.
+For automatic deployments, create a GitHub Actions repository secret named
+`SUPABASE_ACCESS_TOKEN`, then run **Deploy Supabase Edge Functions** from the
+Actions tab. Future changes under `supabase/functions/` are deployed when they
+reach `main`.
+
 Authorized test call:
 
 ```bash
