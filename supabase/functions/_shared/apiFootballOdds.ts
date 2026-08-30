@@ -154,3 +154,26 @@ export async function fetchOddsForDate(
 
   return { fixtures, pagesFetched: page - 1, totalPages, quotaRemaining };
 }
+
+export async function fetchOddsForFixture(
+  apiKey: string,
+  fixtureId: string,
+): Promise<{ fixtures: ApiFootballOddsFixture[]; pagesFetched: number; totalPages: number; quotaRemaining: number | null }> {
+  const url = new URL("https://v3.football.api-sports.io/odds");
+  url.searchParams.set("fixture", fixtureId);
+  url.searchParams.set("page", "1");
+  const response = await fetch(url, { headers: { "x-apisports-key": apiKey } });
+  const remaining = Number(response.headers.get("x-ratelimit-requests-remaining"));
+  const quotaRemaining = Number.isFinite(remaining) ? remaining : null;
+  if (!response.ok) throw new Error(`API-Football fixture odds request failed (${response.status})`);
+
+  const body = (await response.json()) as ApiFootballResponse<ApiFootballOddsFixture>;
+  const errors = Array.isArray(body.errors) ? body.errors : Object.values(body.errors ?? {});
+  if (errors.length > 0) throw new Error(`API-Football error: ${errors.join(", ")}`);
+  return {
+    fixtures: body.response,
+    pagesFetched: 1,
+    totalPages: Math.max(1, body.paging.total),
+    quotaRemaining,
+  };
+}
