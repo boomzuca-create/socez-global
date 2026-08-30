@@ -34,12 +34,13 @@ describe("market-led candidate ranking", () => {
     expect(published[0].score).toBeLessThan(70);
   });
 
-  it("publishes no more than four candidates scoring at least 70%", () => {
+  it("publishes every candidate scoring at least 70% unless an explicit limit is supplied", () => {
     const candidates = rankMarketCandidates([
       ...book("a", 2.1, 3.3, 3.5),
       ...book("b", 2.2, 3.2, 3.4),
       ...book("c", 2.15, 3.25, 3.45),
     ], 100, now);
+    expect(selectPublishedCandidates(candidates)).toHaveLength(3);
     expect(selectPublishedCandidates(candidates, 2)).toHaveLength(2);
     expect(selectPublishedCandidates(candidates, 2).every((candidate) => candidate.score >= 70)).toBe(true);
   });
