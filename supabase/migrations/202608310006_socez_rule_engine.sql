@@ -26,6 +26,9 @@ on public.socez_rule_evaluations (fixture_id, evaluated_at desc);
 create index socez_rule_evaluations_match_idx
 on public.socez_rule_evaluations (model_run_id, status, rule_id);
 
+create unique index if not exists final_picks_one_per_fixture_run
+on public.final_picks (model_run_id, fixture_id);
+
 create table public.verified_context_signals (
   id uuid primary key default gen_random_uuid(),
   fixture_id uuid not null references public.fixtures(id) on delete cascade,
