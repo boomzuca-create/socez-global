@@ -1,6 +1,20 @@
 export type SessionName = "morning" | "evening" | "all";
 export type RegionCode = "EUROPE" | "ASIA" | "AMERICAS" | "AFRICA" | "OCEANIA" | "INTERNATIONAL";
 
+const BIG_FIVE_LEAGUES = new Map<string, { id: number; names: Set<string> }>([
+  ["England", { id: 39, names: new Set(["premier league"]) }],
+  ["Spain", { id: 140, names: new Set(["la liga", "primera division"]) }],
+  ["Germany", { id: 78, names: new Set(["bundesliga"]) }],
+  ["France", { id: 61, names: new Set(["ligue 1"]) }],
+  ["Italy", { id: 135, names: new Set(["serie a"]) }],
+]);
+
+export const TARGET_DOMESTIC_COUNTRIES = new Set([
+  "Armenia", "Australia", "Austria", "Belgium", "Denmark", "Finland", "Hungary", "Malaysia",
+  "Mexico", "Netherlands", "Norway", "Portugal", "Scotland", "Sweden", "Switzerland", "USA",
+  "United-States", "United States", "Chile",
+]);
+
 export interface ApiFootballFixture {
   fixture: {
     id: number;
@@ -77,6 +91,19 @@ export function inferRegion(country: string): RegionCode {
     if (countries.has(country)) return region;
   }
   return "INTERNATIONAL";
+}
+
+export function isTargetCompetition(item: ApiFootballFixture): boolean {
+  const majorLeague = BIG_FIVE_LEAGUES.get(item.league.country);
+  if (majorLeague) {
+    const normalizedName = item.league.name.trim().toLocaleLowerCase("en");
+    return item.league.id === majorLeague.id || majorLeague.names.has(normalizedName);
+  }
+  return TARGET_DOMESTIC_COUNTRIES.has(item.league.country);
+}
+
+export function targetCoverageTier(item: ApiFootballFixture): "A" | "B" {
+  return BIG_FIVE_LEAGUES.has(item.league.country) ? "A" : "B";
 }
 
 function bangkokParts(value: string) {

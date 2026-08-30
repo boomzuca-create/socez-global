@@ -40,8 +40,8 @@ export function PickCard({ pick }: { pick: Pick }) {
         </div>
       </div>
       <div className="pick-metrics">
-        <div><span>Confidence</span><strong>{pick.confidence}</strong></div>
-        <div><span>Data quality</span><strong>{pick.dataQuality}</strong></div>
+        <div><span>SOCEZ score</span><strong>{pick.confidence}%</strong></div>
+        <div><span>Data quality</span><strong>{pick.dataQuality}%</strong></div>
         <div><span>Model edge</span><strong>+{edge}%</strong></div>
         <div><span>Expected value</span><strong>+{(pick.expectedValue * 100).toFixed(1)}%</strong></div>
       </div>

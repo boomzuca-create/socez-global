@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   fixtureDataQuality,
   inferRegion,
+  isTargetCompetition,
   normalizeFixtureStatus,
   selectSessionFixtures,
+  targetCoverageTier,
   type ApiFootballFixture,
 } from "./apiFootball";
 
@@ -43,5 +45,23 @@ describe("API-Football normalization", () => {
     expect(normalizeFixtureStatus("FT")).toBe("FINISHED");
     expect(normalizeFixtureStatus("1H")).toBe("LIVE");
     expect(fixtureDataQuality(fixture("2026-08-30T12:00:00+07:00"))).toBe(100);
+  });
+
+  it("keeps the five major top flights and domestic football in the 17 selected countries", () => {
+    const premierLeague = fixture("2026-08-30T12:00:00+07:00");
+    premierLeague.league = { ...premierLeague.league, id: 39, name: "Premier League", country: "England" };
+    const championship = structuredClone(premierLeague);
+    championship.league = { ...championship.league, id: 40, name: "Championship" };
+    const scotland = structuredClone(premierLeague);
+    scotland.league = { ...scotland.league, id: 179, name: "Premiership", country: "Scotland" };
+    const thailand = structuredClone(premierLeague);
+    thailand.league = { ...thailand.league, id: 296, name: "Thai League 1", country: "Thailand" };
+
+    expect(isTargetCompetition(premierLeague)).toBe(true);
+    expect(isTargetCompetition(championship)).toBe(false);
+    expect(isTargetCompetition(scotland)).toBe(true);
+    expect(isTargetCompetition(thailand)).toBe(false);
+    expect(targetCoverageTier(premierLeague)).toBe("A");
+    expect(targetCoverageTier(scotland)).toBe("B");
   });
 });

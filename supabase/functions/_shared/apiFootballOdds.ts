@@ -33,7 +33,8 @@ export interface NormalizedOdd {
   line: number | null;
   decimalOdds: number;
   capturedAt: string;
-  source: { betId: number; betName: string; rawValue: string };
+  isPrimaryBookmaker: boolean;
+  source: { betId: number; betName: string; rawValue: string; sourceTier: "PRIMARY" | "FALLBACK" };
 }
 
 interface ApiFootballResponse<T> {
@@ -45,7 +46,7 @@ interface ApiFootballResponse<T> {
 
 export const APPROVED_BOOKMAKERS = ["Bet365", "Pinnacle", "Betfair", "William Hill", "Unibet"] as const;
 
-function approvedBookmaker(name: string): boolean {
+export function isApprovedBookmaker(name: string): boolean {
   const normalized = name.trim().toLocaleLowerCase("en");
   return APPROVED_BOOKMAKERS.some((item) => item.toLocaleLowerCase("en") === normalized);
 }
@@ -96,10 +97,10 @@ function normalizeValue(betName: string, value: string): { market: NormalizedMar
   return null;
 }
 
-export function normalizeOddsFixture(item: ApiFootballOddsFixture): NormalizedOdd[] {
+export function normalizeOddsFixture(item: ApiFootballOddsFixture, includeFallback = false): NormalizedOdd[] {
   const capturedAt = new Date(item.update).toISOString();
   return item.bookmakers
-    .filter((bookmaker) => approvedBookmaker(bookmaker.name))
+    .filter((bookmaker) => includeFallback || isApprovedBookmaker(bookmaker.name))
     .flatMap((bookmaker) => bookmaker.bets.flatMap((bet) => bet.values.flatMap((value) => {
       const decimalOdds = parseDecimalOdds(value.odd);
       const normalized = normalizeValue(bet.name, value.value);
@@ -113,7 +114,13 @@ export function normalizeOddsFixture(item: ApiFootballOddsFixture): NormalizedOd
         line: normalized.line,
         decimalOdds,
         capturedAt,
-        source: { betId: bet.id, betName: bet.name, rawValue: value.value },
+        isPrimaryBookmaker: isApprovedBookmaker(bookmaker.name),
+        source: {
+          betId: bet.id,
+          betName: bet.name,
+          rawValue: value.value,
+          sourceTier: isApprovedBookmaker(bookmaker.name) ? "PRIMARY" : "FALLBACK",
+        },
       } satisfies NormalizedOdd];
     })));
 }

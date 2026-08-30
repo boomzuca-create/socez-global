@@ -4,8 +4,10 @@ import {
   fetchFixturesForDate,
   fixtureDataQuality,
   inferRegion,
+  isTargetCompetition,
   normalizeFixtureStatus,
   selectSessionFixtures,
+  targetCoverageTier,
   type ApiFootballFixture,
   type SessionName,
 } from "../_shared/apiFootball.ts";
@@ -54,7 +56,7 @@ Deno.serve(async (request) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const date = bangkokDate();
-  const idempotencyKey = `sync-fixtures:${date}:${session}`;
+  const idempotencyKey = `sync-fixtures:v2:${date}:${session}`;
 
   const { data: existing } = await supabase
     .from("job_runs")
@@ -92,8 +94,9 @@ Deno.serve(async (request) => {
   try {
     const dates = session === "evening" || session === "all" ? [date, addDays(date, 1)] : [date];
     const dailyResponses = await Promise.all(dates.map((item) => fetchFixturesForDate(apiKey, item)));
+    const sessionFixtures = selectSessionFixtures(dailyResponses.flat(), session, date);
     const fixtures = uniqueBy(
-      selectSessionFixtures(dailyResponses.flat(), session, date),
+      sessionFixtures.filter(isTargetCompetition),
       (item) => String(item.fixture.id),
     );
 
@@ -108,6 +111,8 @@ Deno.serve(async (request) => {
           provider: "api-football",
           datesRequested: dates,
           fixturesReceived: dailyResponses.flat().length,
+          fixturesInSessionBeforeScopeFilter: sessionFixtures.length,
+          fixturesOutsideScope: sessionFixtures.length,
           fixturesSelected: 0,
         },
       }).eq("id", job.id);
@@ -116,6 +121,8 @@ Deno.serve(async (request) => {
         session,
         bangkokDate: date,
         fixturesReceived: dailyResponses.flat().length,
+        fixturesInSessionBeforeScopeFilter: sessionFixtures.length,
+        fixturesOutsideScope: sessionFixtures.length,
         fixturesSelected: 0,
         idempotencyKey,
       });
@@ -134,7 +141,7 @@ Deno.serve(async (request) => {
       country: item.league.country,
       name: item.league.name,
       season_label: String(item.league.season),
-      coverage_tier: "C",
+      coverage_tier: targetCoverageTier(item),
       is_active: true,
     }));
     const { data: competitions, error: competitionError } = await supabase
@@ -193,6 +200,8 @@ Deno.serve(async (request) => {
         provider: "api-football",
         datesRequested: dates,
         fixturesReceived: dailyResponses.flat().length,
+        fixturesInSessionBeforeScopeFilter: sessionFixtures.length,
+        fixturesOutsideScope: sessionFixtures.length - fixtureRows.length,
         fixturesSelected: fixtureRows.length,
       },
     }).eq("id", job.id);
@@ -202,6 +211,8 @@ Deno.serve(async (request) => {
       session,
       bangkokDate: date,
       fixturesReceived: dailyResponses.flat().length,
+      fixturesInSessionBeforeScopeFilter: sessionFixtures.length,
+      fixturesOutsideScope: sessionFixtures.length - fixtureRows.length,
       fixturesSelected: fixtureRows.length,
       idempotencyKey,
     });

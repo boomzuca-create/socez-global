@@ -56,7 +56,7 @@ Deno.serve(async (request) => {
 
   const date = bangkokDate();
   const window = sessionWindow(date, session);
-  const idempotencyKey = `sync-odds:${date}:${session}`;
+  const idempotencyKey = `sync-odds:v2:${date}:${session}`;
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -110,7 +110,7 @@ Deno.serve(async (request) => {
     const normalized = providerResponses
       .flatMap((response) => response.fixtures)
       .filter((item) => fixtureIds.has(String(item.fixture.id)))
-      .flatMap(normalizeOddsFixture);
+      .flatMap((item) => normalizeOddsFixture(item, true));
 
     const bookmakerSources = [...new Map(normalized.map((odd) => [odd.bookmakerProviderId, odd])).values()];
     let bookmakerIds = new Map<string, string>();
@@ -122,7 +122,7 @@ Deno.serve(async (request) => {
           provider_bookmaker_id: odd.bookmakerProviderId,
           name: odd.bookmakerName,
           region_code: "GLOBAL",
-          reliability_weight: 1,
+          reliability_weight: odd.isPrimaryBookmaker ? 1 : 0.7,
           is_active: true,
         })), { onConflict: "provider,provider_bookmaker_id" })
         .select("id,provider_bookmaker_id");
@@ -167,6 +167,8 @@ Deno.serve(async (request) => {
       fixturesInWindow: fixtures.length,
       oddsFixturesReceived: providerResponses.reduce((total, response) => total + response.fixtures.length, 0),
       approvedSnapshots: rows.length,
+      primarySnapshots: rows.filter((row) => row.source_payload.sourceTier === "PRIMARY").length,
+      fallbackSnapshots: rows.filter((row) => row.source_payload.sourceTier === "FALLBACK").length,
       pagesFetched,
       pageBudget,
       providerPageLimit,
