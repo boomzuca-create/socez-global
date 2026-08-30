@@ -30,6 +30,16 @@ Global Football Pattern & Value analytics dashboard. The frontend is a static Re
 - Deterministic snapshot identity so retries cannot duplicate line-less 1X2 prices
 - Free-plan provider limit of three odds pages per date is recorded in `job_runs`; incomplete coverage never produces guessed picks
 
+## Milestone 4
+
+- Primary prices still prefer Bet365, Pinnacle, Betfair, William Hill and Unibet
+- Other API-Football bookmakers are retained as explicit lower-weight fallback sources instead of being silently discarded
+- Market-led ranking removes bookmaker margin and compares consensus fair probability with the best available price
+- Every published card shows the overall SOCEZ score and criterion percentages: value, consensus, bookmaker coverage, data quality and freshness
+- Scores at 75% or above are qualified investments; 70–74% are conditional; when none reaches 70%, one clearly labelled Best Available candidate is published
+- A blank day is allowed only when there is no complete usable 1X2, Handicap or O/U market—not merely because no source from the primary five appears
+- Fixture scope is intentionally limited to the Premier League, La Liga, Bundesliga, Ligue 1 and Serie A, plus domestic competitions in Armenia, Australia, Austria, Belgium, Denmark, Finland, Hungary, Malaysia, Mexico, Netherlands, Norway, Portugal, Scotland, Sweden, Switzerland, USA and Chile
+
 ## Local development
 
 ```bash
