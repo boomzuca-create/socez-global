@@ -68,7 +68,7 @@ Deno.serve(async (request) => {
 
   const date = bangkokDate();
   const window = sessionWindow(date, session);
-  const idempotencyKey = `generate-picks:${date}:${session}`;
+  const idempotencyKey = `generate-picks:v2:${date}:${session}`;
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -125,7 +125,8 @@ Deno.serve(async (request) => {
   try {
     const { data: fixtures, error: fixtureError } = await supabase
       .from("fixtures")
-      .select("id,data_quality")
+      .select("id,data_quality,competition:competitions!inner(coverage_tier)")
+      .in("competition.coverage_tier", ["A", "B"])
       .gte("kickoff_at", window.start)
       .lt("kickoff_at", window.end)
       .order("kickoff_at");
