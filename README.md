@@ -28,7 +28,7 @@ Global Football Pattern & Value analytics dashboard. The frontend is a static Re
 - Strict normalization for 1X2, Asian Handicap and Goals O/U
 - Approved global bookmaker set: Bet365, Pinnacle, Betfair, William Hill and Unibet
 - Deterministic snapshot identity so retries cannot duplicate line-less 1X2 prices
-- Free-plan page budget is recorded in `job_runs`; incomplete coverage never produces guessed picks
+- Free-plan provider limit of three odds pages per date is recorded in `job_runs`; incomplete coverage never produces guessed picks
 
 ## Local development
 

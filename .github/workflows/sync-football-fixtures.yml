@@ -1,11 +1,6 @@
 name: Sync Football Fixtures
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/sync-football-fixtures.yml"
   schedule:
     - cron: "0 4 * * *"
     - cron: "0 11 * * *"
@@ -54,7 +49,6 @@ jobs:
           SESSION: ${{ steps.session.outputs.name }}
         run: |
           curl --silent --show-error --fail-with-body \
-            --retry 2 --retry-all-errors \
             --request POST \
             --header "x-cron-secret: $CRON_SECRET" \
             "https://qkiradbwrajrqgnyjhvd.supabase.co/functions/v1/sync-fixtures?session=$SESSION"
@@ -65,7 +59,6 @@ jobs:
           SESSION: ${{ steps.session.outputs.name }}
         run: |
           curl --silent --show-error --fail-with-body \
-            --retry 2 --retry-all-errors \
             --request POST \
             --header "x-cron-secret: $CRON_SECRET" \
             "https://qkiradbwrajrqgnyjhvd.supabase.co/functions/v1/sync-odds?session=$SESSION"
