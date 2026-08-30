@@ -2,7 +2,6 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { addDays, type SessionName } from "../_shared/apiFootball.ts";
 import {
   rankMarketCandidates,
-  selectPublishedCandidates,
   type MarketSnapshot,
   type RankedCandidate,
 } from "../_shared/marketSelection.ts";
@@ -108,7 +107,7 @@ Deno.serve(async (request) => {
       completed_at: null,
       error_message: null,
     }).eq("id", modelRunId);
-    await supabase.from("final_picks").delete().eq("model_run_id", modelRunId);
+    await supabase.from("market_candidates").delete().eq("model_run_id", modelRunId);
   } else {
     const { data: createdRun, error: runError } = await supabase.from("model_runs").insert({
       model_version_id: model.id,
@@ -123,25 +122,6 @@ Deno.serve(async (request) => {
   }
 
   try {
-    const { data: windowFixtures, error: windowFixtureError } = await supabase
-      .from("fixtures")
-      .select("id,competition:competitions!inner(coverage_tier)")
-      .in("competition.coverage_tier", ["A", "B"])
-      .gte("kickoff_at", window.start)
-      .lt("kickoff_at", window.end);
-    if (windowFixtureError || !windowFixtures) {
-      throw new Error(`Could not load session fixture scope: ${windowFixtureError?.message ?? "unknown"}`);
-    }
-    const windowFixtureIds = windowFixtures.map((fixture) => fixture.id);
-    if (windowFixtureIds.length > 0) {
-      const { error: voidError } = await supabase
-        .from("final_picks")
-        .update({ status: "VOID" })
-        .in("fixture_id", windowFixtureIds)
-        .in("status", ["OPEN", "PENDING"]);
-      if (voidError) throw new Error(`Could not retire superseded picks: ${voidError.message}`);
-    }
-
     const { data: fixtures, error: fixtureError } = await supabase
       .from("fixtures")
       .select("id,data_quality,competition:competitions!inner(coverage_tier)")
@@ -184,10 +164,8 @@ Deno.serve(async (request) => {
       if (candidate) perFixture.push({ fixtureId: fixture.id, dataQuality: Number(fixture.data_quality), candidate });
     }
 
-    const selectedCandidates = selectPublishedCandidates(perFixture.map((item) => item.candidate));
-    const selected = selectedCandidates.map((candidate) => perFixture.find((item) => item.candidate === candidate)!);
-    if (selected.length > 0) {
-      const { error: pickError } = await supabase.from("final_picks").insert(selected.map(({ fixtureId, dataQuality, candidate }) => ({
+    if (perFixture.length > 0) {
+      const { error: candidateError } = await supabase.from("market_candidates").insert(perFixture.map(({ fixtureId, dataQuality, candidate }) => ({
         fixture_id: fixtureId,
         model_run_id: modelRunId,
         model_version_id: model.id,
@@ -199,32 +177,20 @@ Deno.serve(async (request) => {
         model_probability: candidate.modelProbability,
         market_probability: candidate.marketProbability,
         expected_value: candidate.expectedValue,
-        confidence: candidate.score,
+        market_score: candidate.score,
         data_quality: dataQuality,
         risk_flag: candidate.riskFlag,
-        signals: [candidate.tier, ...candidate.signals],
-        evidence: {
-          scope: "MARKET_LED_SELECTION_V1",
-          tier: candidate.tier,
-          overallScore: candidate.score,
-          qualificationThreshold: 70,
-          investThreshold: 75,
-          criteria: candidate.criteria,
-          bookmakerCount: candidate.bookmakerCount,
-          note: candidate.tier === "BEST_AVAILABLE"
-            ? "Best available selection; below the standard 70% qualification threshold"
-            : "Published from market consensus, source coverage, price freshness and data quality",
-        },
-        stake_units: 1,
-        status: "OPEN",
+        tier: candidate.tier,
+        criteria: { ...candidate.criteria, bookmakerCount: candidate.bookmakerCount },
+        signals: candidate.signals,
         price_locked_at: candidate.priceCapturedAt,
       })));
-      if (pickError) throw new Error(`Could not publish picks: ${pickError.message}`);
+      if (candidateError) throw new Error(`Could not store private market candidates: ${candidateError.message}`);
     }
 
     await supabase.from("model_runs").update({
       fixtures_scanned: fixtures.length,
-      fixtures_qualified: selected.length,
+      fixtures_qualified: 0,
       status: "SUCCEEDED",
       completed_at: new Date().toISOString(),
     }).eq("id", modelRunId);
@@ -235,10 +201,10 @@ Deno.serve(async (request) => {
       modelVersion: model.version,
       fixturesScanned: fixtures.length,
       fixturesWithUsableMarkets: perFixture.length,
-      picksPublished: selected.length,
-      qualifiedThreshold: 70,
-      scores: selected.map((item) => item.candidate.score),
-      tiers: selected.map((item) => item.candidate.tier),
+      marketCandidatesStored: perFixture.length,
+      picksPublished: 0,
+      finalPickGate: "SOCEZ_RULE_EVIDENCE_REQUIRED",
+      reason: "Market-only candidates are private research data and cannot be published as SOCEZ Final Picks",
       idempotencyKey,
     });
   } catch (error) {
