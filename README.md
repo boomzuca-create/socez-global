@@ -39,6 +39,7 @@ Global Football Pattern & Value analytics dashboard. The frontend is a static Re
 - Free-plan odds calls are targeted directly at in-scope fixtures in five batches of eight (up to 40 per session); batches are spaced by 65 seconds to stay below the provider's short-window rate limit
 - Pick generation excludes matches that have started, restricts AH/O/U investment prices to 1.80–2.00, and retires superseded open picks before publishing a corrected run
 - The workflow stops later odds batches when the provider reports five or fewer daily requests remaining
+- Qualified picks require at least +5% expected value; positive EV below that may be Conditional, while non-positive EV is never labelled Qualified
 - Every published card shows the overall SOCEZ score and criterion percentages: value, consensus, bookmaker coverage, data quality and freshness
 - Scores at 75% or above are qualified investments; 70–74% are conditional; when none reaches 70%, one clearly labelled Best Available candidate is published
 - A blank day is allowed only when there is no complete usable 1X2, Handicap or O/U market—not merely because no source from the primary five appears
