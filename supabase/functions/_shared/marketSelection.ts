@@ -147,7 +147,8 @@ export function rankMarketCandidates(
   }).sort((left, right) => right.score - left.score || right.expectedValue - left.expectedValue);
 }
 
-export function selectPublishedCandidates(candidates: RankedCandidate[], maximum = 4): RankedCandidate[] {
-  const qualified = candidates.filter((candidate) => candidate.score >= 70).slice(0, maximum);
+export function selectPublishedCandidates(candidates: RankedCandidate[], maximum?: number): RankedCandidate[] {
+  const rankedQualified = candidates.filter((candidate) => candidate.score >= 70);
+  const qualified = maximum === undefined ? rankedQualified : rankedQualified.slice(0, maximum);
   return qualified.length > 0 ? qualified : candidates.slice(0, 1);
 }
