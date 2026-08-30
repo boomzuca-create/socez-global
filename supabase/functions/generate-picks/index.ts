@@ -162,7 +162,7 @@ Deno.serve(async (request) => {
       if (candidate) perFixture.push({ fixtureId: fixture.id, dataQuality: Number(fixture.data_quality), candidate });
     }
 
-    const selectedCandidates = selectPublishedCandidates(perFixture.map((item) => item.candidate), 4);
+    const selectedCandidates = selectPublishedCandidates(perFixture.map((item) => item.candidate));
     const selected = selectedCandidates.map((candidate) => perFixture.find((item) => item.candidate === candidate)!);
     if (selected.length > 0) {
       const { error: pickError } = await supabase.from("final_picks").insert(selected.map(({ fixtureId, dataQuality, candidate }) => ({
