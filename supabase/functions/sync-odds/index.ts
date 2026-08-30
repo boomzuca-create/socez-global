@@ -99,8 +99,9 @@ Deno.serve(async (request) => {
     if (fixtureError || !fixtures) throw new Error(`Could not load session fixtures: ${fixtureError?.message ?? "unknown"}`);
 
     const fixtureIds = new Map(fixtures.map((fixture) => [fixture.provider_fixture_id, fixture.id]));
-    const pageBudget = 8;
-    const pagesPerDate = Math.max(1, Math.floor(pageBudget / window.dates.length));
+    const providerPageLimit = 3;
+    const pagesPerDate = providerPageLimit;
+    const pageBudget = providerPageLimit * window.dates.length;
     const providerResponses = [];
     for (const requestedDate of window.dates) {
       providerResponses.push(await fetchOddsForDate(apiKey, requestedDate, pagesPerDate));
@@ -168,6 +169,7 @@ Deno.serve(async (request) => {
       approvedSnapshots: rows.length,
       pagesFetched,
       pageBudget,
+      providerPageLimit,
       quotaRemaining,
       truncated: providerResponses.some((response) => response.pagesFetched < response.totalPages),
     };
