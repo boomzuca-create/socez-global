@@ -254,7 +254,7 @@ function SimplePage({ title, eyebrow, description, children }: { title: string; 
 }
 
 function NoPicks() {
-  return <div className="empty-state"><strong>No qualified picks</strong><span>The model scanned available fixtures but none passed every required gate.</span></div>;
+  return <div className="empty-state"><strong>No usable market data</strong><span>No complete 1X2, Handicap or O/U price set was available. When market data exists, the system publishes the highest-ranked candidate and shows every criterion percentage.</span></div>;
 }
 
 function HealthItem({ label, status, detail }: { label: string; status: string; detail: string }) {
