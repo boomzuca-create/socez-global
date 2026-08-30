@@ -53,10 +53,14 @@ Deno.serve(async (request) => {
   if (!["morning", "evening", "all"].includes(session)) {
     return json(400, { error: "session must be morning, evening or all" });
   }
+  const batch = Number(requestUrl.searchParams.get("batch") ?? "0");
+  if (!Number.isInteger(batch) || batch < 0 || batch > 4) {
+    return json(400, { error: "batch must be an integer from 0 to 4" });
+  }
 
   const date = bangkokDate();
   const window = sessionWindow(date, session);
-  const idempotencyKey = `sync-odds:v3:${date}:${session}`;
+  const idempotencyKey = `sync-odds:v4:${date}:${session}:batch-${batch}`;
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -83,7 +87,7 @@ Deno.serve(async (request) => {
       records_processed: 0,
       error_message: null,
       idempotency_key: idempotencyKey,
-      details: { session, bangkokDate: date, provider: "api-football", quotaMode: "FREE" },
+      details: { session, batch, bangkokDate: date, provider: "api-football", quotaMode: "FREE" },
     }, { onConflict: "idempotency_key" })
     .select("id")
     .single();
@@ -101,8 +105,9 @@ Deno.serve(async (request) => {
     if (fixtureError || !fixtures) throw new Error(`Could not load session fixtures: ${fixtureError?.message ?? "unknown"}`);
 
     const fixtureIds = new Map(fixtures.map((fixture) => [fixture.provider_fixture_id, fixture.id]));
-    const requestBudget = 40;
-    const requestedFixtures = fixtures.slice(0, requestBudget);
+    const batchSize = 8;
+    const batchStart = batch * batchSize;
+    const requestedFixtures = fixtures.slice(batchStart, batchStart + batchSize);
     const providerResponses = [];
     for (const fixture of requestedFixtures) {
       const response = await fetchOddsForFixture(apiKey, fixture.provider_fixture_id);
@@ -163,12 +168,15 @@ Deno.serve(async (request) => {
     const quotaRemaining = providerResponses.at(-1)?.quotaRemaining ?? null;
     const details = {
       session,
+      batch,
       bangkokDate: date,
       provider: "api-football",
       quotaMode: "FREE",
       datesRequested: window.dates,
       fixturesInWindow: fixtures.length,
-      fixtureRequestBudget: requestBudget,
+      batchSize,
+      batchStart,
+      maximumSessionCoverage: batchSize * 5,
       fixturesRequested: providerResponses.length,
       oddsFixturesReceived: providerResponses.reduce((total, response) => total + response.fixtures.length, 0),
       approvedSnapshots: rows.length,
@@ -177,7 +185,7 @@ Deno.serve(async (request) => {
       pagesFetched,
       requestMode: "TARGETED_FIXTURE",
       quotaRemaining,
-      truncated: fixtures.length > providerResponses.length,
+      truncated: fixtures.length > batchStart + providerResponses.length,
     };
 
     await supabase.from("job_runs").update({

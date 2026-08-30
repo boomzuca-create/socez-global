@@ -36,7 +36,7 @@ Global Football Pattern & Value analytics dashboard. The frontend is a static Re
 - Other API-Football bookmakers are retained as explicit lower-weight fallback sources instead of being silently discarded
 - Market-led ranking removes bookmaker margin and compares consensus fair probability with the best available price
 - Every match may publish one Primary Bet, with no daily or per-session pick ceiling when multiple matches pass the threshold
-- Free-plan odds calls are targeted directly at in-scope fixtures (up to 40 per session) so the page limit is not wasted on out-of-scope competitions
+- Free-plan odds calls are targeted directly at in-scope fixtures in five batches of eight (up to 40 per session); batches are spaced by 65 seconds to stay below the provider's short-window rate limit
 - Every published card shows the overall SOCEZ score and criterion percentages: value, consensus, bookmaker coverage, data quality and freshness
 - Scores at 75% or above are qualified investments; 70–74% are conditional; when none reaches 70%, one clearly labelled Best Available candidate is published
 - A blank day is allowed only when there is no complete usable 1X2, Handicap or O/U market—not merely because no source from the primary five appears
