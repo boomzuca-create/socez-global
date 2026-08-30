@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { addDays, type SessionName } from "../_shared/apiFootball.ts";
-import { fetchOddsForDate, normalizeOddsFixture, type NormalizedOdd } from "../_shared/apiFootballOdds.ts";
+import { fetchOddsForFixture, normalizeOddsFixture, type NormalizedOdd } from "../_shared/apiFootballOdds.ts";
 
 const jsonHeaders = { "content-type": "application/json; charset=utf-8" };
 
@@ -56,7 +56,7 @@ Deno.serve(async (request) => {
 
   const date = bangkokDate();
   const window = sessionWindow(date, session);
-  const idempotencyKey = `sync-odds:v2:${date}:${session}`;
+  const idempotencyKey = `sync-odds:v3:${date}:${session}`;
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -92,19 +92,22 @@ Deno.serve(async (request) => {
   try {
     const { data: fixtures, error: fixtureError } = await supabase
       .from("fixtures")
-      .select("id,provider_fixture_id")
+      .select("id,provider_fixture_id,competition:competitions!inner(coverage_tier)")
       .eq("provider", "api-football")
+      .in("competition.coverage_tier", ["A", "B"])
       .gte("kickoff_at", window.start)
-      .lt("kickoff_at", window.end);
+      .lt("kickoff_at", window.end)
+      .order("kickoff_at");
     if (fixtureError || !fixtures) throw new Error(`Could not load session fixtures: ${fixtureError?.message ?? "unknown"}`);
 
     const fixtureIds = new Map(fixtures.map((fixture) => [fixture.provider_fixture_id, fixture.id]));
-    const providerPageLimit = 3;
-    const pagesPerDate = providerPageLimit;
-    const pageBudget = providerPageLimit * window.dates.length;
+    const requestBudget = 40;
+    const requestedFixtures = fixtures.slice(0, requestBudget);
     const providerResponses = [];
-    for (const requestedDate of window.dates) {
-      providerResponses.push(await fetchOddsForDate(apiKey, requestedDate, pagesPerDate));
+    for (const fixture of requestedFixtures) {
+      const response = await fetchOddsForFixture(apiKey, fixture.provider_fixture_id);
+      providerResponses.push(response);
+      if (response.quotaRemaining !== null && response.quotaRemaining <= 5) break;
     }
 
     const normalized = providerResponses
@@ -165,15 +168,16 @@ Deno.serve(async (request) => {
       quotaMode: "FREE",
       datesRequested: window.dates,
       fixturesInWindow: fixtures.length,
+      fixtureRequestBudget: requestBudget,
+      fixturesRequested: providerResponses.length,
       oddsFixturesReceived: providerResponses.reduce((total, response) => total + response.fixtures.length, 0),
       approvedSnapshots: rows.length,
       primarySnapshots: rows.filter((row) => row.source_payload.sourceTier === "PRIMARY").length,
       fallbackSnapshots: rows.filter((row) => row.source_payload.sourceTier === "FALLBACK").length,
       pagesFetched,
-      pageBudget,
-      providerPageLimit,
+      requestMode: "TARGETED_FIXTURE",
       quotaRemaining,
-      truncated: providerResponses.some((response) => response.pagesFetched < response.totalPages),
+      truncated: fixtures.length > providerResponses.length,
     };
 
     await supabase.from("job_runs").update({
