@@ -18,17 +18,17 @@ const navItems: Array<{ key: PageKey; label: string; short: string }> = [
 ];
 
 const patternRules = [
-  "Rematch within 7 days — O/U reversal",
-  "Rematch in 8–14 days — O/U continuation",
-  "Same venue rematch — price repeat",
-  "Reversed venue rematch — price recovery",
-  "Two consecutive 0–0 league draws",
-  "Three consecutive 1–1 results",
-  "Two consecutive 2–0 first-half profiles",
-  "Two red cards with no subsequent goal",
-  "Club identity / animal-pattern experiment",
-  "Manager criticism news signal",
-  "New-manager first-match context",
+  { name: "Rematch within 7 days — O/U reversal", status: "Definition required" },
+  { name: "Rematch in 8–14 days — O/U continuation", status: "Experimental · backtest required" },
+  { name: "Same venue rematch — price repeat", status: "Experimental · backtest required" },
+  { name: "Reversed venue rematch — price recovery", status: "Experimental · backtest required" },
+  { name: "Two consecutive 0–0 league draws", status: "Experimental · backtest required" },
+  { name: "Three consecutive 1–1 results", status: "Experimental · backtest required" },
+  { name: "Two consecutive 2–0 first-half profiles", status: "Experimental · backtest required" },
+  { name: "Two red cards with no subsequent goal", status: "Experimental · backtest required" },
+  { name: "Club identity / animal-pattern experiment", status: "Definition required" },
+  { name: "Manager criticism news signal", status: "Definition required" },
+  { name: "New-manager first-match context", status: "Definition required" },
 ];
 
 interface DashboardPickRow {
@@ -237,11 +237,11 @@ function App() {
           </div>
         )}
 
-        {page === "picks" && <SimplePage title="Today's qualified picks" eyebrow="11:00 + 18:00 SESSIONS" description="Only fixtures that pass data quality, confidence and value gates are published.">{picks.length > 0 ? <div className="pick-grid">{picks.map((pick) => <PickCard key={pick.id} pick={pick} />)}</div> : <NoPicks />}</SimplePage>}
+        {page === "picks" && <SimplePage title="Today's SOCEZ Final Picks" eyebrow="11:00 + 18:00 SESSIONS" description="A Final Pick requires verified evidence from at least one SOCEZ rule plus market, freshness and value confirmation.">{picks.length > 0 ? <div className="pick-grid">{picks.map((pick) => <PickCard key={pick.id} pick={pick} />)}</div> : <NoPicks />}</SimplePage>}
 
         {page === "results" && <SimplePage title="Results explorer" eyebrow="AUDITABLE SETTLEMENT" description="Day, month and year filters read graded results from Supabase."><ResultsTable results={results} preview={dataMode !== "live"} /></SimplePage>}
 
-        {page === "model" && <SimplePage title="Pattern model lab" eyebrow="MODEL v1.0" description="Each pattern begins as experimental and earns weight only through walk-forward validation."><div className="rule-grid">{patternRules.map((rule, index) => <article key={rule}><span>RULE {String(index + 1).padStart(2, "0")}</span><strong>{rule}</strong><small>{index < 8 ? "Ready for backtest" : "Definition required"}</small></article>)}</div></SimplePage>}
+        {page === "model" && <SimplePage title="SOCEZ 11-rule model lab" eyebrow="FINAL PICK HARD GATE" description="Market-only candidates remain private. A public Final Pick must include verified evidence from at least one SOCEZ rule."><div className="rule-grid">{patternRules.map((rule, index) => <article key={rule.name}><span>RULE {String(index + 1).padStart(2, "0")}</span><strong>{rule.name}</strong><small>{rule.status}</small></article>)}</div></SimplePage>}
 
         {page === "system" && <SimplePage title="System health" eyebrow="AUTOMATION CONTROL" description="Cron history, data freshness and provider status will be visible here."><div className="health-grid"><HealthItem label="Supabase database" status="Healthy" detail="Singapore · ap-southeast-1" /><HealthItem label="11:00 model run" status="Not scheduled" detail="Migration required" /><HealthItem label="18:00 model run" status="Not scheduled" detail="Migration required" /><HealthItem label="06:00 settlement" status="Not scheduled" detail="Migration required" /><HealthItem label="Football data provider" status="Not configured" detail="API adapter pending" /><HealthItem label="LINE notification" status="Not configured" detail="Channel token pending" /></div></SimplePage>}
       </main>
@@ -254,7 +254,7 @@ function SimplePage({ title, eyebrow, description, children }: { title: string; 
 }
 
 function NoPicks() {
-  return <div className="empty-state"><strong>No usable market data</strong><span>No complete 1X2, Handicap or O/U price set was available. When market data exists, the system publishes the highest-ranked candidate and shows every criterion percentage.</span></div>;
+  return <div className="empty-state"><strong>No SOCEZ Final Pick</strong><span>No fixture has passed a verified SOCEZ 1–11 rule with market confirmation. Market-only candidates are retained privately for research and are never published as Final Picks.</span></div>;
 }
 
 function HealthItem({ label, status, detail }: { label: string; status: string; detail: string }) {
