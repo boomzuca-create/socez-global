@@ -60,7 +60,7 @@ Deno.serve(async (request) => {
 
   const date = bangkokDate();
   const window = sessionWindow(date, session);
-  const idempotencyKey = `sync-odds:v4:${date}:${session}:batch-${batch}`;
+  const idempotencyKey = `sync-odds:v5:${date}:${session}:batch-${batch}`;
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -99,8 +99,10 @@ Deno.serve(async (request) => {
       .select("id,provider_fixture_id,competition:competitions!inner(coverage_tier)")
       .eq("provider", "api-football")
       .in("competition.coverage_tier", ["A", "B"])
+      .eq("status", "SCHEDULED")
       .gte("kickoff_at", window.start)
       .lt("kickoff_at", window.end)
+      .gt("kickoff_at", new Date().toISOString())
       .order("kickoff_at");
     if (fixtureError || !fixtures) throw new Error(`Could not load session fixtures: ${fixtureError?.message ?? "unknown"}`);
 
