@@ -13,6 +13,15 @@ Global Football Pattern & Value analytics dashboard. The frontend is a static Re
 - Tested 1X2, Asian Handicap and O/U quarter-line settlement helpers
 - GitHub Actions verification and Pages deployment
 
+## Milestone 2
+
+- API-Football normalization adapter
+- Secure Supabase Edge Function for fixture ingestion
+- Bangkok 11:00–18:00 and 18:00–05:00 session filtering
+- Provider job idempotency and audit logging
+- Live regional metrics and cumulative-profit views
+- Dashboard separation between real Supabase data and illustrative preview data
+
 ## Local development
 
 ```bash
@@ -41,6 +50,41 @@ Run it once. The migration creates the normalized data model, enables RLS and ex
 - `public_results`
 
 Until the migration is applied, the frontend intentionally shows clearly labelled preview data.
+
+After Milestone 2, also run:
+
+`supabase/migrations/202608300002_live_metrics.sql`
+
+This adds public, aggregate-only performance and system-health views. It does not expose raw odds, provider payloads or job error details.
+
+## API-Football ingestion
+
+The `sync-fixtures` Edge Function uses the official API-Football v3 endpoint and keeps provider credentials server-side.
+
+Required Supabase function secrets:
+
+```text
+API_FOOTBALL_KEY=your_api_football_key
+CRON_SECRET=a_long_random_value
+```
+
+`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are supplied automatically by the hosted Supabase Functions runtime. Never copy them into frontend code.
+
+Deploy with the Supabase CLI after linking the project:
+
+```bash
+supabase link --project-ref qkiradbwrajrqgnyjhvd
+supabase secrets set API_FOOTBALL_KEY=YOUR_KEY CRON_SECRET=YOUR_RANDOM_SECRET
+supabase functions deploy sync-fixtures --no-verify-jwt
+```
+
+Authorized test call:
+
+```bash
+curl -X POST \
+  "https://qkiradbwrajrqgnyjhvd.supabase.co/functions/v1/sync-fixtures?session=morning" \
+  -H "x-cron-secret: YOUR_RANDOM_SECRET"
+```
 
 ## GitHub Pages
 

@@ -4,7 +4,7 @@ import { ProfitChart } from "./components/ProfitChart";
 import { mockPicks, mockProfitCurve, mockRegionMetrics } from "./data/mockData";
 import { calculateTotals, calculateWinRate, formatPercent } from "./lib/metrics";
 import { supabase } from "./lib/supabase";
-import type { Pick } from "./types";
+import type { Pick, ProfitPoint, RegionMetric } from "./types";
 
 type PageKey = "dashboard" | "picks" | "results" | "model" | "system";
 type DataMode = "loading" | "live" | "preview";
@@ -54,6 +54,32 @@ interface DashboardPickRow {
   signals: string[] | null;
 }
 
+interface PerformanceRow {
+  region: RegionMetric["region"];
+  label: string;
+  wins: number;
+  losses: number;
+  pushes: number;
+  profit_units: number;
+}
+
+interface ProfitRow {
+  result_date: string;
+  cumulative_profit: number;
+}
+
+interface ResultRow {
+  id: string;
+  settled_at: string;
+  region: string;
+  market: string;
+  selection: string;
+  line: number | null;
+  decimal_odds: number;
+  result: string;
+  profit_units: number;
+}
+
 function mapPick(row: DashboardPickRow): Pick {
   return {
     id: row.id,
@@ -82,8 +108,15 @@ function mapPick(row: DashboardPickRow): Pick {
 function App() {
   const [page, setPage] = useState<PageKey>("dashboard");
   const [picks, setPicks] = useState<Pick[]>(mockPicks);
+  const [regionMetrics, setRegionMetrics] = useState<RegionMetric[]>([]);
+  const [profitCurve, setProfitCurve] = useState<ProfitPoint[]>([]);
+  const [results, setResults] = useState<ResultRow[]>([]);
   const [dataMode, setDataMode] = useState<DataMode>("loading");
-  const totals = useMemo(() => calculateTotals(mockRegionMetrics), []);
+  const displayedMetrics = dataMode === "live" ? regionMetrics : mockRegionMetrics;
+  const displayedCurve = dataMode === "live"
+    ? (profitCurve.length > 0 ? profitCurve : [{ label: "No results", value: 0 }])
+    : mockProfitCurve;
+  const totals = useMemo(() => calculateTotals(displayedMetrics), [displayedMetrics]);
   const winRate = calculateWinRate(totals.wins, totals.losses);
   const graded = totals.wins + totals.losses;
   const roi = graded === 0 ? 0 : (totals.profitUnits / graded) * 100;
@@ -91,10 +124,36 @@ function App() {
   useEffect(() => {
     let active = true;
     async function loadPicks() {
-      const { data, error } = await supabase.from("public_current_picks").select("*").order("kickoff_at");
+      const [pickResponse, metricResponse, curveResponse, resultResponse] = await Promise.all([
+        supabase.from("public_current_picks").select("*").order("kickoff_at"),
+        supabase.from("public_performance_summary").select("*").order("region"),
+        supabase.from("public_profit_curve").select("*").order("result_date"),
+        supabase.from("public_results").select("*").order("settled_at", { ascending: false }).limit(100),
+      ]);
       if (!active) return;
-      if (!error && data) {
-        setPicks((data as DashboardPickRow[]).map(mapPick));
+      if (!pickResponse.error && pickResponse.data) {
+        setPicks((pickResponse.data as DashboardPickRow[]).map(mapPick));
+        setRegionMetrics(
+          metricResponse.error || !metricResponse.data
+            ? []
+            : (metricResponse.data as PerformanceRow[]).map((row) => ({
+                region: row.region,
+                label: row.label,
+                wins: row.wins,
+                losses: row.losses,
+                pushes: row.pushes,
+                profitUnits: Number(row.profit_units),
+              })),
+        );
+        setProfitCurve(
+          curveResponse.error || !curveResponse.data
+            ? []
+            : (curveResponse.data as ProfitRow[]).map((row) => ({
+                label: new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", timeZone: "Asia/Bangkok" }).format(new Date(`${row.result_date}T12:00:00+07:00`)),
+                value: Number(row.cumulative_profit),
+              })),
+        );
+        setResults(resultResponse.error || !resultResponse.data ? [] : resultResponse.data as ResultRow[]);
         setDataMode("live");
       } else {
         setDataMode("preview");
@@ -160,12 +219,12 @@ function App() {
             <section className="dashboard-grid">
               <article className="panel panel--chart">
                 <div className="panel-heading"><div><span className="eyebrow">PERFORMANCE</span><h2>Cumulative profit</h2></div><span className="trend-up">+3.7 U this week</span></div>
-                <ProfitChart points={mockProfitCurve} />
+                <ProfitChart points={displayedCurve} />
               </article>
               <article className="panel region-panel">
                 <div className="panel-heading"><div><span className="eyebrow">REGIONAL EDGE</span><h2>Win rate by region</h2></div></div>
                 <div className="region-list">
-                  {mockRegionMetrics.map((metric) => {
+                  {displayedMetrics.map((metric) => {
                     const rate = calculateWinRate(metric.wins, metric.losses);
                     return <div className="region-row" key={metric.region}><div><strong>{metric.label}</strong><span>{metric.wins + metric.losses} graded</span></div><div className="rate-track"><i style={{ width: `${rate}%` }} /></div><strong>{formatPercent(rate)}</strong></div>;
                   })}
@@ -180,7 +239,7 @@ function App() {
 
         {page === "picks" && <SimplePage title="Today's qualified picks" eyebrow="11:00 + 18:00 SESSIONS" description="Only fixtures that pass data quality, confidence and value gates are published.">{picks.length > 0 ? <div className="pick-grid">{picks.map((pick) => <PickCard key={pick.id} pick={pick} />)}</div> : <NoPicks />}</SimplePage>}
 
-        {page === "results" && <SimplePage title="Results explorer" eyebrow="AUDITABLE SETTLEMENT" description="Day, month and year filters will read graded results from Supabase."><ResultsTable /></SimplePage>}
+        {page === "results" && <SimplePage title="Results explorer" eyebrow="AUDITABLE SETTLEMENT" description="Day, month and year filters read graded results from Supabase."><ResultsTable results={results} preview={dataMode !== "live"} /></SimplePage>}
 
         {page === "model" && <SimplePage title="Pattern model lab" eyebrow="MODEL v1.0" description="Each pattern begins as experimental and earns weight only through walk-forward validation."><div className="rule-grid">{patternRules.map((rule, index) => <article key={rule}><span>RULE {String(index + 1).padStart(2, "0")}</span><strong>{rule}</strong><small>{index < 8 ? "Ready for backtest" : "Definition required"}</small></article>)}</div></SimplePage>}
 
@@ -203,8 +262,18 @@ function HealthItem({ label, status, detail }: { label: string; status: string; 
   return <article className="health-item"><i className={healthy ? "health-dot health-dot--ok" : "health-dot"} /><div><strong>{label}</strong><span>{detail}</span></div><small>{status}</small></article>;
 }
 
-function ResultsTable() {
-  return <div className="results-panel"><div className="filter-bar"><button className="filter-active">7 days</button><button>30 days</button><button>Year</button><span>All regions · All markets</span></div><div className="table-wrap"><table><thead><tr><th>Date</th><th>Region</th><th>Market</th><th>Selection</th><th>Odds</th><th>Result</th><th>P/L</th></tr></thead><tbody><tr><td>29 Aug</td><td>Europe</td><td>AH</td><td>Home -0.25</td><td>1.94</td><td><span className="result result--win">WIN</span></td><td className="positive">+0.94 U</td></tr><tr><td>29 Aug</td><td>Asia</td><td>O/U</td><td>Over 2.25</td><td>1.91</td><td><span className="result result--push">PUSH</span></td><td>0.00 U</td></tr><tr><td>28 Aug</td><td>Americas</td><td>1X2</td><td>Home</td><td>2.08</td><td><span className="result result--loss">LOSS</span></td><td className="negative">-1.00 U</td></tr></tbody></table></div><p className="preview-note">Illustrative records — live results appear after the Supabase migration is applied.</p></div>;
+function ResultsTable({ results, preview }: { results: ResultRow[]; preview: boolean }) {
+  const previewRows: ResultRow[] = [
+    { id: "preview-1", settled_at: "2026-08-29T12:00:00Z", region: "Europe", market: "AH", selection: "Home", line: -0.25, decimal_odds: 1.94, result: "FULL_WIN", profit_units: 0.94 },
+    { id: "preview-2", settled_at: "2026-08-29T12:00:00Z", region: "Asia", market: "OU", selection: "Over", line: 2.25, decimal_odds: 1.91, result: "PUSH", profit_units: 0 },
+    { id: "preview-3", settled_at: "2026-08-28T12:00:00Z", region: "Americas", market: "1X2", selection: "Home", line: null, decimal_odds: 2.08, result: "FULL_LOSS", profit_units: -1 },
+  ];
+  const rows = preview ? previewRows : results;
+  if (rows.length === 0) return <div className="empty-state"><strong>No settled results</strong><span>Results will appear after the first qualified pick has been graded.</span></div>;
+  return <div className="results-panel"><div className="filter-bar"><button className="filter-active">7 days</button><button>30 days</button><button>Year</button><span>All regions · All markets</span></div><div className="table-wrap"><table><thead><tr><th>Date</th><th>Region</th><th>Market</th><th>Selection</th><th>Odds</th><th>Result</th><th>P/L</th></tr></thead><tbody>{rows.map((row) => {
+    const resultClass = row.result.includes("WIN") ? "win" : row.result === "PUSH" ? "push" : "loss";
+    return <tr key={row.id}><td>{new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", timeZone: "Asia/Bangkok" }).format(new Date(row.settled_at))}</td><td>{row.region}</td><td>{row.market}</td><td>{row.selection} {row.line ?? ""}</td><td>{Number(row.decimal_odds).toFixed(2)}</td><td><span className={`result result--${resultClass}`}>{row.result.replace("FULL_", "")}</span></td><td className={row.profit_units > 0 ? "positive" : row.profit_units < 0 ? "negative" : ""}>{row.profit_units > 0 ? "+" : ""}{Number(row.profit_units).toFixed(2)} U</td></tr>;
+  })}</tbody></table></div>{preview && <p className="preview-note">Illustrative records — live results appear after settlement.</p>}</div>;
 }
 
 export default App;
