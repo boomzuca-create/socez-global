@@ -32,5 +32,5 @@ jobs:
         with:
           version: latest
 
-      - name: Deploy sync-fixtures
-        run: supabase functions deploy sync-fixtures --project-ref "$SUPABASE_PROJECT_REF"
+      - name: Deploy Edge Functions
+        run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF"

@@ -22,6 +22,14 @@ Global Football Pattern & Value analytics dashboard. The frontend is a static Re
 - Live regional metrics and cumulative-profit views
 - Dashboard separation between real Supabase data and illustrative preview data
 
+## Milestone 3
+
+- Quota-aware API-Football pre-match odds ingestion
+- Strict normalization for 1X2, Asian Handicap and Goals O/U
+- Approved global bookmaker set: Bet365, Pinnacle, Betfair, William Hill and Unibet
+- Deterministic snapshot identity so retries cannot duplicate line-less 1X2 prices
+- Free-plan page budget is recorded in `job_runs`; incomplete coverage never produces guessed picks
+
 ## Local development
 
 ```bash
@@ -56,6 +64,12 @@ After Milestone 2, also run:
 `supabase/migrations/202608300002_live_metrics.sql`
 
 This adds public, aggregate-only performance and system-health views. It does not expose raw odds, provider payloads or job error details.
+
+Before enabling Milestone 3 odds synchronization, also run:
+
+`supabase/migrations/202608300003_odds_snapshot_key.sql`
+
+This adds a deterministic private snapshot key used for idempotent odds ingestion.
 
 ## API-Football ingestion
 
