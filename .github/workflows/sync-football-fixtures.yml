@@ -62,3 +62,13 @@ jobs:
             --request POST \
             --header "x-cron-secret: $CRON_SECRET" \
             "https://qkiradbwrajrqgnyjhvd.supabase.co/functions/v1/sync-odds?session=$SESSION"
+
+      - name: Generate ranked investment picks
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SESSION: ${{ steps.session.outputs.name }}
+        run: |
+          curl --silent --show-error --fail-with-body \
+            --request POST \
+            --header "x-cron-secret: $CRON_SECRET" \
+            "https://qkiradbwrajrqgnyjhvd.supabase.co/functions/v1/generate-picks?session=$SESSION"
