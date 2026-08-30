@@ -58,3 +58,14 @@ jobs:
             --request POST \
             --header "x-cron-secret: $CRON_SECRET" \
             "https://qkiradbwrajrqgnyjhvd.supabase.co/functions/v1/sync-fixtures?session=$SESSION"
+
+      - name: Synchronize pre-match odds
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SESSION: ${{ steps.session.outputs.name }}
+        run: |
+          curl --silent --show-error --fail-with-body \
+            --retry 2 --retry-all-errors \
+            --request POST \
+            --header "x-cron-secret: $CRON_SECRET" \
+            "https://qkiradbwrajrqgnyjhvd.supabase.co/functions/v1/sync-odds?session=$SESSION"
