@@ -68,7 +68,7 @@ Deno.serve(async (request) => {
 
   const date = bangkokDate();
   const window = sessionWindow(date, session);
-  const idempotencyKey = `generate-picks:v3:${date}:${session}`;
+  const idempotencyKey = `generate-picks:v4:${date}:${session}`;
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -123,6 +123,25 @@ Deno.serve(async (request) => {
   }
 
   try {
+    const { data: windowFixtures, error: windowFixtureError } = await supabase
+      .from("fixtures")
+      .select("id,competition:competitions!inner(coverage_tier)")
+      .in("competition.coverage_tier", ["A", "B"])
+      .gte("kickoff_at", window.start)
+      .lt("kickoff_at", window.end);
+    if (windowFixtureError || !windowFixtures) {
+      throw new Error(`Could not load session fixture scope: ${windowFixtureError?.message ?? "unknown"}`);
+    }
+    const windowFixtureIds = windowFixtures.map((fixture) => fixture.id);
+    if (windowFixtureIds.length > 0) {
+      const { error: voidError } = await supabase
+        .from("final_picks")
+        .update({ status: "VOID" })
+        .in("fixture_id", windowFixtureIds)
+        .in("status", ["OPEN", "PENDING"]);
+      if (voidError) throw new Error(`Could not retire superseded picks: ${voidError.message}`);
+    }
+
     const { data: fixtures, error: fixtureError } = await supabase
       .from("fixtures")
       .select("id,data_quality,competition:competitions!inner(coverage_tier)")
@@ -135,14 +154,6 @@ Deno.serve(async (request) => {
     if (fixtureError || !fixtures) throw new Error(`Could not load fixtures: ${fixtureError?.message ?? "unknown"}`);
 
     const fixtureIds = fixtures.map((fixture) => fixture.id);
-    if (fixtureIds.length > 0) {
-      const { error: voidError } = await supabase
-        .from("final_picks")
-        .update({ status: "VOID" })
-        .in("fixture_id", fixtureIds)
-        .in("status", ["OPEN", "PENDING"]);
-      if (voidError) throw new Error(`Could not retire superseded picks: ${voidError.message}`);
-    }
     let odds: OddsRow[] = [];
     if (fixtureIds.length > 0) {
       const { data: oddsData, error: oddsError } = await supabase
