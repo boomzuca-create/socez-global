@@ -40,9 +40,11 @@ describe("market-led candidate ranking", () => {
       ...book("b", 2.2, 3.2, 3.4),
       ...book("c", 2.15, 3.25, 3.45),
     ], 100, now);
-    expect(selectPublishedCandidates(candidates)).toHaveLength(3);
-    expect(selectPublishedCandidates(candidates, 2)).toHaveLength(2);
-    expect(selectPublishedCandidates(candidates, 2).every((candidate) => candidate.score >= 70)).toBe(true);
+    const qualified = { ...candidates[0], tier: "QUALIFIED" as const, score: 80, expectedValue: 0.06 };
+    const sixQualified = Array.from({ length: 6 }, (_, index) => ({ ...qualified, selection: `PICK_${index}` }));
+    expect(selectPublishedCandidates(sixQualified)).toHaveLength(6);
+    expect(selectPublishedCandidates(sixQualified, 2)).toHaveLength(2);
+    expect(selectPublishedCandidates(sixQualified, 2).every((candidate) => candidate.score >= 70)).toBe(true);
   });
 
   it("rejects alternate Asian lines priced outside the approved 1.80 to 2.00 band", () => {
@@ -51,5 +53,16 @@ describe("market-led candidate ranking", () => {
       { bookmakerId: "a", reliabilityWeight: 1, market: "AH", selection: "AWAY", line: 1.5, decimalOdds: 1.02, capturedAt },
     ];
     expect(rankMarketCandidates(rows, 100, now)).toHaveLength(0);
+  });
+
+  it("does not qualify a high-coverage candidate with non-positive expected value", () => {
+    const candidates = rankMarketCandidates([
+      ...book("a", 2.0, 3.2, 4.0),
+      ...book("b", 2.0, 3.2, 4.0),
+      ...book("c", 2.0, 3.2, 4.0),
+    ], 100, now);
+    const home = candidates.find((candidate) => candidate.selection === "HOME")!;
+    expect(home.expectedValue).toBeLessThanOrEqual(0);
+    expect(home.tier).toBe("BEST_AVAILABLE");
   });
 });

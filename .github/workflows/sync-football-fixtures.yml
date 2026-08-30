@@ -64,6 +64,10 @@ jobs:
               --header "x-cron-secret: $CRON_SECRET" \
               "https://qkiradbwrajrqgnyjhvd.supabase.co/functions/v1/sync-odds?session=$SESSION&batch=$batch")
             echo "$response"
+            sync_status=$(echo "$response" | jq -r '.status // "UNKNOWN"')
+            if [ "$sync_status" = "SKIPPED" ]; then
+              continue
+            fi
             remaining=$(echo "$response" | jq -r '.quotaRemaining // 999')
             if [ "$remaining" -le 5 ]; then
               echo "Stopping odds batches with $remaining provider requests remaining."
