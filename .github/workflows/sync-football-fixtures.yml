@@ -69,7 +69,7 @@ jobs:
               continue
             fi
             remaining=$(echo "$response" | jq -r '.quotaRemaining // 999')
-            if [ "$remaining" -le 5 ]; then
+            if [ "$remaining" -le 10 ]; then
               echo "Stopping odds batches with $remaining provider requests remaining."
               break
             fi
