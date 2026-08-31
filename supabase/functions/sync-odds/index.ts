@@ -114,7 +114,7 @@ Deno.serve(async (request) => {
     for (const fixture of requestedFixtures) {
       const response = await fetchOddsForFixture(apiKey, fixture.provider_fixture_id);
       providerResponses.push(response);
-      if (response.quotaRemaining !== null && response.quotaRemaining <= 5) break;
+      if (response.quotaRemaining !== null && response.quotaRemaining <= 10) break;
     }
 
     const normalized = providerResponses
