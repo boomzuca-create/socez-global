@@ -3,6 +3,7 @@ import { PickCard } from "./components/PickCard";
 import { ProfitChart } from "./components/ProfitChart";
 import { mockPicks, mockProfitCurve, mockRegionMetrics } from "./data/mockData";
 import { calculateTotals, calculateWinRate, formatPercent } from "./lib/metrics";
+import { nextModelRun } from "./lib/modelSchedule";
 import { supabase } from "./lib/supabase";
 import type { Pick, ProfitPoint, RegionMetric } from "./types";
 
@@ -203,7 +204,7 @@ function App() {
                 <h1>Investment overview</h1>
                 <p>Pattern-led signals, market-normalized probabilities and auditable results.</p>
               </div>
-              <div className="next-run"><span>Next model run</span><strong>18:00</strong><small>Bangkok time</small></div>
+              <div className="next-run"><span>Next model run</span><strong>{nextModelRun()}</strong><small>Bangkok time</small></div>
             </section>
 
             <section className="metric-grid">

@@ -11,6 +11,7 @@ import {
   type ApiFootballFixture,
   type SessionName,
 } from "../_shared/apiFootball.ts";
+import { selectHistoryBackfillDates } from "../_shared/historyBackfill.ts";
 
 const jsonHeaders = { "content-type": "application/json; charset=utf-8" };
 
@@ -95,8 +96,34 @@ Deno.serve(async (request) => {
     const dates = session === "evening" || session === "all" ? [date, addDays(date, 1)] : [date];
     const dailyResponses = await Promise.all(dates.map((item) => fetchFixturesForDate(apiKey, item)));
     const sessionFixtures = selectSessionFixtures(dailyResponses.flat(), session, date);
-    const fixtures = uniqueBy(
+    let historyDates: string[] = [];
+    let historyResponses: ApiFootballFixture[][] = [];
+    if (session === "morning") {
+      const { data: previousHistoryRuns, error: historyRunError } = await supabase
+        .from("job_runs")
+        .select("details")
+        .eq("job_name", "sync-fixtures")
+        .eq("status", "SUCCEEDED")
+        .order("completed_at", { ascending: false })
+        .limit(100);
+      if (historyRunError) throw new Error(`Could not load history sync state: ${historyRunError.message}`);
+      const synchronizedDates = (previousHistoryRuns ?? []).flatMap((run) => {
+        const requested = (run.details as Record<string, unknown> | null)?.historyDatesRequested;
+        return Array.isArray(requested) ? requested.filter((item): item is string => typeof item === "string") : [];
+      });
+      historyDates = selectHistoryBackfillDates(date, synchronizedDates);
+      historyResponses = await Promise.all(historyDates.map((item) => fetchFixturesForDate(apiKey, item)));
+    }
+    const selectedSessionFixtures = uniqueBy(
       sessionFixtures.filter(isTargetCompetition),
+      (item) => String(item.fixture.id),
+    );
+    const selectedHistoryFixtures = uniqueBy(
+      historyResponses.flat().filter(isTargetCompetition),
+      (item) => String(item.fixture.id),
+    );
+    const fixtures = uniqueBy(
+      [...selectedSessionFixtures, ...selectedHistoryFixtures],
       (item) => String(item.fixture.id),
     );
 
@@ -112,8 +139,11 @@ Deno.serve(async (request) => {
           datesRequested: dates,
           fixturesReceived: dailyResponses.flat().length,
           fixturesInSessionBeforeScopeFilter: sessionFixtures.length,
-          fixturesOutsideScope: sessionFixtures.length,
+          fixturesOutsideScope: sessionFixtures.length + historyResponses.flat().length,
           fixturesSelected: 0,
+          historyDatesRequested: historyDates,
+          historyFixturesReceived: historyResponses.flat().length,
+          historyFixturesSelected: 0,
         },
       }).eq("id", job.id);
       return json(200, {
@@ -122,8 +152,11 @@ Deno.serve(async (request) => {
         bangkokDate: date,
         fixturesReceived: dailyResponses.flat().length,
         fixturesInSessionBeforeScopeFilter: sessionFixtures.length,
-        fixturesOutsideScope: sessionFixtures.length,
+        fixturesOutsideScope: sessionFixtures.length + historyResponses.flat().length,
         fixturesSelected: 0,
+        historyDatesRequested: historyDates,
+        historyFixturesReceived: historyResponses.flat().length,
+        historyFixturesSelected: 0,
         idempotencyKey,
       });
     }
@@ -201,8 +234,15 @@ Deno.serve(async (request) => {
         datesRequested: dates,
         fixturesReceived: dailyResponses.flat().length,
         fixturesInSessionBeforeScopeFilter: sessionFixtures.length,
-        fixturesOutsideScope: sessionFixtures.length - fixtureRows.length,
+        fixturesOutsideScope:
+          sessionFixtures.length - selectedSessionFixtures.length +
+          historyResponses.flat().length - selectedHistoryFixtures.length,
         fixturesSelected: fixtureRows.length,
+        sessionFixturesSelected: selectedSessionFixtures.length,
+        historyDatesRequested: historyDates,
+        historyFixturesReceived: historyResponses.flat().length,
+        historyFixturesSelected: selectedHistoryFixtures.length,
+        providerRequests: dates.length + historyDates.length,
       },
     }).eq("id", job.id);
 
@@ -212,8 +252,15 @@ Deno.serve(async (request) => {
       bangkokDate: date,
       fixturesReceived: dailyResponses.flat().length,
       fixturesInSessionBeforeScopeFilter: sessionFixtures.length,
-      fixturesOutsideScope: sessionFixtures.length - fixtureRows.length,
+      fixturesOutsideScope:
+        sessionFixtures.length - selectedSessionFixtures.length +
+        historyResponses.flat().length - selectedHistoryFixtures.length,
       fixturesSelected: fixtureRows.length,
+      sessionFixturesSelected: selectedSessionFixtures.length,
+      historyDatesRequested: historyDates,
+      historyFixturesReceived: historyResponses.flat().length,
+      historyFixturesSelected: selectedHistoryFixtures.length,
+      providerRequests: dates.length + historyDates.length,
       idempotencyKey,
     });
   } catch (error) {
