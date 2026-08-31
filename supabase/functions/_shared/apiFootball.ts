@@ -37,6 +37,12 @@ export interface ApiFootballFixture {
     away: { id: number; name: string; logo: string | null; winner: boolean | null };
   };
   goals: { home: number | null; away: number | null };
+  score?: {
+    halftime: { home: number | null; away: number | null };
+    fulltime: { home: number | null; away: number | null };
+    extratime: { home: number | null; away: number | null };
+    penalty: { home: number | null; away: number | null };
+  };
 }
 
 interface ApiFootballResponse<T> {

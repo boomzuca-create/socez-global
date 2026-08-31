@@ -1,0 +1,26 @@
+name: Settle Football Results
+
+on:
+  schedule:
+    - cron: "0 23 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: settle-football-results-production
+  cancel-in-progress: false
+
+jobs:
+  settle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Settle locked SOCEZ Final Picks
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl --silent --show-error --fail-with-body \
+            --request POST \
+            --header "x-cron-secret: $CRON_SECRET" \
+            "https://qkiradbwrajrqgnyjhvd.supabase.co/functions/v1/settle-results"
