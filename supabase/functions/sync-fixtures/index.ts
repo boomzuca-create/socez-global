@@ -11,7 +11,11 @@ import {
   type ApiFootballFixture,
   type SessionName,
 } from "../_shared/apiFootball.ts";
-import { selectHistoryBackfillDates } from "../_shared/historyBackfill.ts";
+import {
+  fetchHistoryBackfillBestEffort,
+  selectHistoryBackfillDates,
+  type HistoryBackfillFailure,
+} from "../_shared/historyBackfill.ts";
 
 const jsonHeaders = { "content-type": "application/json; charset=utf-8" };
 
@@ -57,7 +61,7 @@ Deno.serve(async (request) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const date = bangkokDate();
-  const idempotencyKey = `sync-fixtures:v2:${date}:${session}`;
+  const idempotencyKey = `sync-fixtures:v3:${date}:${session}`;
 
   const { data: existing } = await supabase
     .from("job_runs")
@@ -98,6 +102,8 @@ Deno.serve(async (request) => {
     const sessionFixtures = selectSessionFixtures(dailyResponses.flat(), session, date);
     let historyDates: string[] = [];
     let historyResponses: ApiFootballFixture[][] = [];
+    let historyDatesSucceeded: string[] = [];
+    let historyFailures: HistoryBackfillFailure[] = [];
     if (session === "morning") {
       const { data: previousHistoryRuns, error: historyRunError } = await supabase
         .from("job_runs")
@@ -108,11 +114,20 @@ Deno.serve(async (request) => {
         .limit(100);
       if (historyRunError) throw new Error(`Could not load history sync state: ${historyRunError.message}`);
       const synchronizedDates = (previousHistoryRuns ?? []).flatMap((run) => {
-        const requested = (run.details as Record<string, unknown> | null)?.historyDatesRequested;
-        return Array.isArray(requested) ? requested.filter((item): item is string => typeof item === "string") : [];
+        const details = run.details as Record<string, unknown> | null;
+        const completed = details?.historyDatesSucceeded ?? details?.historyDatesRequested;
+        return Array.isArray(completed) ? completed.filter((item): item is string => typeof item === "string") : [];
       });
-      historyDates = selectHistoryBackfillDates(date, synchronizedDates);
-      historyResponses = await Promise.all(historyDates.map((item) => fetchFixturesForDate(apiKey, item)));
+      // The free plan exposes only a narrow rolling date window. Accumulate
+      // yesterday once per morning instead of trying to backfill 60 days.
+      historyDates = selectHistoryBackfillDates(date, synchronizedDates, 1, 1);
+      const history = await fetchHistoryBackfillBestEffort(
+        historyDates,
+        (item) => fetchFixturesForDate(apiKey, item),
+      );
+      historyResponses = history.responses;
+      historyDatesSucceeded = history.succeededDates;
+      historyFailures = history.failures;
     }
     const selectedSessionFixtures = uniqueBy(
       sessionFixtures.filter(isTargetCompetition),
@@ -142,8 +157,12 @@ Deno.serve(async (request) => {
           fixturesOutsideScope: sessionFixtures.length + historyResponses.flat().length,
           fixturesSelected: 0,
           historyDatesRequested: historyDates,
+          historyDatesSucceeded,
+          historyFailures,
+          historyStatus: historyFailures.length > 0 ? "PARTIAL" : historyDates.length > 0 ? "COMPLETE" : "SKIPPED",
           historyFixturesReceived: historyResponses.flat().length,
           historyFixturesSelected: 0,
+          providerRequests: dates.length + historyDates.length,
         },
       }).eq("id", job.id);
       return json(200, {
@@ -155,8 +174,12 @@ Deno.serve(async (request) => {
         fixturesOutsideScope: sessionFixtures.length + historyResponses.flat().length,
         fixturesSelected: 0,
         historyDatesRequested: historyDates,
+        historyDatesSucceeded,
+        historyFailures,
+        historyStatus: historyFailures.length > 0 ? "PARTIAL" : historyDates.length > 0 ? "COMPLETE" : "SKIPPED",
         historyFixturesReceived: historyResponses.flat().length,
         historyFixturesSelected: 0,
+        providerRequests: dates.length + historyDates.length,
         idempotencyKey,
       });
     }
@@ -240,6 +263,9 @@ Deno.serve(async (request) => {
         fixturesSelected: fixtureRows.length,
         sessionFixturesSelected: selectedSessionFixtures.length,
         historyDatesRequested: historyDates,
+        historyDatesSucceeded,
+        historyFailures,
+        historyStatus: historyFailures.length > 0 ? "PARTIAL" : historyDates.length > 0 ? "COMPLETE" : "SKIPPED",
         historyFixturesReceived: historyResponses.flat().length,
         historyFixturesSelected: selectedHistoryFixtures.length,
         providerRequests: dates.length + historyDates.length,
@@ -258,6 +284,9 @@ Deno.serve(async (request) => {
       fixturesSelected: fixtureRows.length,
       sessionFixturesSelected: selectedSessionFixtures.length,
       historyDatesRequested: historyDates,
+      historyDatesSucceeded,
+      historyFailures,
+      historyStatus: historyFailures.length > 0 ? "PARTIAL" : historyDates.length > 0 ? "COMPLETE" : "SKIPPED",
       historyFixturesReceived: historyResponses.flat().length,
       historyFixturesSelected: selectedHistoryFixtures.length,
       providerRequests: dates.length + historyDates.length,
